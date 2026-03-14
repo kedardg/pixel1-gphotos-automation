@@ -1,0 +1,10 @@
+services:
+  gphotos-backup:
+    build: .
+    volumes:
+      - .:/app
+      - ./config.json:/app/config.json:ro
+      - ./state.db:/app/state.db
+      - ./logs:/app/logs
+    environment:
+      - PYTHONUNBUFFERED=1

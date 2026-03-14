@@ -1,0 +1,9 @@
+state.db
+state.db-wal
+state.db-shm
+*.lock
+logs/
+.venv/
+__pycache__/
+*.pyc
+.DS_Store

@@ -1,0 +1,8 @@
+{
+  "nas_photos_path": "/Volumes/Data1/Photos",
+  "adb_binary": "/opt/homebrew/bin/adb",
+  "device_folder": "/sdcard/DCIM/GPhotosProxy",
+  "batch_size_bytes": 8589934592,
+  "photo_upload_window_seconds": 14400,
+  "video_upload_window_seconds": 43200
+}

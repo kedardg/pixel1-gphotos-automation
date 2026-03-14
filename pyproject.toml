@@ -1,0 +1,8 @@
+[project]
+name = "gphotos-backup"
+version = "1.0.0"
+requires-python = ">=3.12"
+dependencies = ["watchdog>=4.0"]
+
+[project.scripts]
+gphotos-backup = "gphotos_backup.__main__:main"
