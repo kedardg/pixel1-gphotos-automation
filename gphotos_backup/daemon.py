@@ -7,6 +7,9 @@ import subprocess
 import threading
 from pathlib import Path
 
+import shutil
+import tempfile
+
 from .adb import AdbClient
 from .config import (
     ADB_SERVER_RESTART_INTERVAL,
@@ -15,7 +18,8 @@ from .config import (
     MIN_DEVICE_FREE_BYTES,
     WATCH_MODE_BUFFER_SECONDS,
 )
-from .scanner import NasScanner, start_observer
+from .scanner import NasScanner, device_filename, start_observer
+from .splitter import needs_split, split_video
 from .state import FileStatus, StateDB
 
 logger = logging.getLogger(__name__)
@@ -233,6 +237,7 @@ class Daemon:
 
         # Push files
         pushed = []
+        split_chunks: dict[int, list[str]] = {}  # file.id -> list of device_filenames for chunks
         for file in batch:
             if self._shutdown.should_exit:
                 break
@@ -250,12 +255,21 @@ class Daemon:
                 self._db.increment_retry(file.id)
                 continue
 
-            success = self._adb.push_file(file.nas_path, file.device_filename)
-            if success and self._adb.verify_push(file.device_filename, file.size_bytes):
-                self._db.update_status(file.id, FileStatus.ON_DEVICE)
-                pushed.append(file)
+            if needs_split(file.size_bytes, file.is_video):
+                chunk_names = self._push_split_video(file)
+                if chunk_names:
+                    self._db.update_status(file.id, FileStatus.ON_DEVICE)
+                    pushed.append(file)
+                    split_chunks[file.id] = chunk_names
+                else:
+                    self._db.increment_retry(file.id)
             else:
-                self._db.increment_retry(file.id)
+                success = self._adb.push_file(file.nas_path, file.device_filename)
+                if success and self._adb.verify_push(file.device_filename, file.size_bytes):
+                    self._db.update_status(file.id, FileStatus.ON_DEVICE)
+                    pushed.append(file)
+                else:
+                    self._db.increment_retry(file.id)
 
         if not pushed:
             logger.warning("No files successfully pushed in batch cycle #%d", self._cycle_count)
@@ -278,7 +292,11 @@ class Daemon:
         for file in pushed:
             if self._shutdown.should_exit:
                 break
-            self._adb.delete_file(file.device_filename)
+            if file.id in split_chunks:
+                for chunk_name in split_chunks[file.id]:
+                    self._adb.delete_file(chunk_name)
+            else:
+                self._adb.delete_file(file.device_filename)
             self._db.update_status(file.id, FileStatus.PRESUMED_UPLOADED)
 
         # Maintenance
@@ -287,13 +305,54 @@ class Daemon:
 
         self._log_progress()
 
+    def _push_split_video(self, file) -> list[str] | None:
+        """Split a large video and push all chunks. Returns list of device filenames or None."""
+        tmp_dir = Path(tempfile.mkdtemp(prefix="gphotos_split_"))
+        try:
+            chunks = split_video(file.nas_path, tmp_dir)
+            if not chunks:
+                return None
+
+            chunk_device_names = []
+            for chunk_path in chunks:
+                dev_name = device_filename(str(chunk_path), chunk_path.name)
+                success = self._adb.push_file(str(chunk_path), dev_name)
+                if not success:
+                    logger.error("Failed to push chunk %s", chunk_path.name)
+                    # Clean up already-pushed chunks
+                    for pushed_name in chunk_device_names:
+                        self._adb.delete_file(pushed_name)
+                    return None
+                chunk_device_names.append(dev_name)
+
+            logger.info(
+                "Pushed %d chunks for %s (%.1f MB total)",
+                len(chunk_device_names),
+                file.filename,
+                file.size_bytes / 1024 / 1024,
+            )
+            return chunk_device_names
+        finally:
+            shutil.rmtree(tmp_dir, ignore_errors=True)
+
     def _wait_with_checks(self, window_seconds: float) -> None:
-        """Sleep in chunks, checking connectivity periodically."""
+        """Sleep in chunks, checking connectivity and upload activity.
+
+        Monitors WiFi tx_bytes to detect when Google Photos finishes uploading.
+        If tx_bytes stays flat for IDLE_THRESHOLD consecutive checks, we assume
+        uploads are done and move on early.
+        """
         elapsed = 0.0
-        chunk = float(CONNECTIVITY_CHECK_INTERVAL_SECONDS)
+        check_interval = 300.0  # check every 5 minutes
+        idle_threshold = 3  # consecutive idle checks before declaring done
+        # Minimum wait before early exit (let Google Photos start uploading)
+        min_wait = 600.0  # 10 minutes
+
+        idle_count = 0
+        prev_tx_bytes: int | None = None
 
         while elapsed < window_seconds and not self._shutdown.should_exit:
-            remaining = min(chunk, window_seconds - elapsed)
+            remaining = min(check_interval, window_seconds - elapsed)
             self._shutdown.wait(timeout=remaining)
             elapsed += remaining
 
@@ -306,6 +365,31 @@ class Daemon:
                 break
 
             self._adb.set_standby_bucket()
+
+            # Check upload activity via WiFi tx bytes
+            tx_bytes = self._adb.get_wifi_tx_bytes()
+            if tx_bytes is not None and elapsed >= min_wait:
+                if prev_tx_bytes is not None:
+                    delta = tx_bytes - prev_tx_bytes
+                    if delta < 1024 * 100:  # less than 100 KB in 5 min = idle
+                        idle_count += 1
+                        logger.info(
+                            "Upload idle check %d/%d (tx delta: %d bytes, elapsed: %.0f min)",
+                            idle_count, idle_threshold, delta, elapsed / 60,
+                        )
+                        if idle_count >= idle_threshold:
+                            logger.info(
+                                "Upload appears complete — tx idle for %d checks (%.0f min elapsed of %.0f min window)",
+                                idle_count, elapsed / 60, window_seconds / 60,
+                            )
+                            break
+                    else:
+                        idle_count = 0
+                        logger.info(
+                            "Upload active (tx delta: %.1f MB, elapsed: %.0f min)",
+                            delta / 1024 / 1024, elapsed / 60,
+                        )
+                prev_tx_bytes = tx_bytes
 
     def _log_progress(self) -> None:
         progress = self._db.get_progress()

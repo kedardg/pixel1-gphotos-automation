@@ -129,6 +129,20 @@ class AdbClient:
         except subprocess.TimeoutExpired:
             return True  # Assume connected if check fails
 
+    def get_wifi_tx_bytes(self) -> int | None:
+        """Read total wlan0 transmitted bytes from /proc/net/dev."""
+        try:
+            result = self._run("shell", "cat", "/proc/net/dev", timeout=10)
+            if result.returncode != 0:
+                return None
+            for line in result.stdout.splitlines():
+                if "wlan0:" in line:
+                    parts = line.split()
+                    return int(parts[9])  # tx_bytes is column 10 (0-indexed: 9)
+        except (subprocess.TimeoutExpired, ValueError, IndexError):
+            pass
+        return None
+
     def restart_server(self) -> None:
         """Kill and restart ADB server to prevent staleness over long runtimes."""
         logger.info("Restarting ADB server")

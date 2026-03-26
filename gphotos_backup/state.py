@@ -45,7 +45,7 @@ class FileStatus(StrEnum):
 _VALID_TRANSITIONS: dict[FileStatus, set[FileStatus]] = {
     FileStatus.PENDING: {FileStatus.ON_DEVICE, FileStatus.FAILED},
     FileStatus.ON_DEVICE: {FileStatus.PRESUMED_UPLOADED},
-    FileStatus.FAILED: {FileStatus.PENDING, FileStatus.PERMANENTLY_FAILED},
+    FileStatus.FAILED: {FileStatus.PENDING, FileStatus.ON_DEVICE, FileStatus.PERMANENTLY_FAILED},
     FileStatus.PERMANENTLY_FAILED: {FileStatus.PENDING},
 }
 
@@ -128,9 +128,9 @@ class StateDB:
         cursor = self._conn.execute(
             "SELECT id, nas_path, filename, device_filename, size_bytes, file_mtime, "
             "is_video, status, pushed_at, deleted_at, retry_count, error_msg "
-            "FROM photos WHERE status = ? AND is_video = ? "
+            "FROM photos WHERE status IN (?, ?) AND is_video = ? "
             "ORDER BY file_mtime ASC",
-            (FileStatus.PENDING.value, int(is_video)),
+            (FileStatus.PENDING.value, FileStatus.FAILED.value, int(is_video)),
         )
 
         batch: list[FileRecord] = []
@@ -215,8 +215,8 @@ class StateDB:
 
     def has_pending_or_on_device(self) -> bool:
         row = self._conn.execute(
-            "SELECT EXISTS(SELECT 1 FROM photos WHERE status IN (?, ?))",
-            (FileStatus.PENDING.value, FileStatus.ON_DEVICE.value),
+            "SELECT EXISTS(SELECT 1 FROM photos WHERE status IN (?, ?, ?))",
+            (FileStatus.PENDING.value, FileStatus.ON_DEVICE.value, FileStatus.FAILED.value),
         ).fetchone()
         return bool(row and row[0])
 

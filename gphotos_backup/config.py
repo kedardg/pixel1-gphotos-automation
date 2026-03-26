@@ -31,6 +31,7 @@ CONNECTIVITY_CHECK_INTERVAL_SECONDS = 900  # 15 min
 WATCH_MODE_BUFFER_SECONDS = 1800  # 30 min
 MIN_DEVICE_FREE_BYTES = 5 * 1024**3  # 5 GB
 MAX_RETRIES = 3
+MAX_FILE_SIZE_BYTES = int(3.7 * 1024**3)  # 3.7 GB — split videos larger than this
 ADB_SERVER_RESTART_INTERVAL = 10  # restart ADB server every N cycles
 
 
