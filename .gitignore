@@ -12,3 +12,6 @@ config.json
 exif_fix_list.json
 Conversation-Summary.md
 Home-NAS-Research-Report.md
+docs/
+STATE_MACHINE_BUG_PREVENTION.md
+todos/
