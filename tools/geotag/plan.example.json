@@ -1,0 +1,11 @@
+{
+  "_comment": "Segment plan schema. 'default' applies to any frame not covered by a segment. Each segment maps an inclusive idx range (from index.json, chronological) to a coordinate. A segment with a 'route' polyline spreads its frames evenly along the path; add 'roundtrip': true to go out and back. Fill in real lat/lon yourself.",
+  "city": "Trip A",
+  "default": {"place": "city centre", "lat": 0.0, "lon": 0.0},
+  "segments": [
+    {"from": 0,  "to": 40,  "place": "landmark one", "lat": 0.0, "lon": 0.0},
+    {"from": 41, "to": 90,  "place": "landmark two", "lat": 0.0, "lon": 0.0},
+    {"from": 91, "to": 140, "place": "boat/ferry leg", "roundtrip": true,
+     "route": [[0.0, 0.0], [0.0, 0.0], [0.0, 0.0]]}
+  ]
+}

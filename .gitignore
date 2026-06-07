@@ -15,3 +15,6 @@ Home-NAS-Research-Report.md
 docs/
 STATE_MACHINE_BUG_PREVENTION.md
 todos/
+
+# Personal geotag provenance (real place plans + photo index maps)
+tools/geotag/_local/

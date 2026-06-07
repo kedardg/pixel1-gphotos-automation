@@ -15,7 +15,7 @@ EXIT_ADB_MISSING = 5
 # Hardcoded constants (not user-configurable)
 SUPPORTED_EXTENSIONS = frozenset({
     ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".heic", ".heif",
-    ".tiff", ".tif", ".raw", ".cr2", ".nef", ".arw", ".dng",
+    ".tiff", ".tif", ".raw", ".cr2", ".nef", ".arw", ".dng", ".rw2", ".gpr",
     ".mp4", ".mov", ".avi", ".mkv", ".m4v", ".3gp", ".wmv", ".webm",
 })
 
