@@ -16,5 +16,8 @@ docs/
 STATE_MACHINE_BUG_PREVENTION.md
 todos/
 
-# Personal geotag provenance (real place plans + photo index maps)
+# Personal provenance (real place plans, photo index maps, dedup reports)
 tools/geotag/_local/
+tools/dedup/_local/
+tools/gopro/_local/
+_dup_quarantine/

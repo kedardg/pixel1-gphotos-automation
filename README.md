@@ -96,6 +96,21 @@ gphotos_backup/
   splitter.py   # ffmpeg-based video splitting for files > 3.7 GB
 ```
 
+## Pre-upload tooling (`tools/`)
+
+One-off, source-side helpers to run on a batch **before** the daemon uploads it.
+Each has its own README.
+
+- `tools/geotag/` — add GPS to GPS-less photos by visual cues (face-blurred
+  contact sheets → per-segment plan → in-place exiftool). See its README.
+- `tools/dedup/` — find byte-identical duplicates (name → size → hash) and
+  quarantine the extra copies non-destructively before uploading.
+- `tools/gopro/` — redate GoPro clips whose camera clock was wrong and stamp a
+  location (e.g. all of a trip to one date + island).
+
+Recommended order on a fresh batch: **dedup → geotag/redate → upload** (metadata
+edits change bytes, so dedup by hash first).
+
 ## Notes
 
 - The phone needs to stay plugged in, on WiFi, with Google Photos installed and signed in. The daemon foregrounds Google Photos itself so background-sync limits don't stall progress.
